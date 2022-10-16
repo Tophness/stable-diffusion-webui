@@ -459,10 +459,12 @@ def update_tracker(prompt):
 		"right": prompt,
 		"diff_level": "word"
 	}
-	response = requests.post(api_url, json=data_raw).text
-	response2 = requests.get("https://lexica.art/api/v1/search?q=" + prompt).json()
-	searchimage = response2["images"][0]["src"]
-	newspan = "<span><img src='" + searchimage + "'><br><span<" + response + "</span></span>"
+	response1 = requests.get("https://lexica.art/api/v1/search?q=" + prompt).json()["images"][0]["src"] # get prediction image from lexica.art
+	response2 = requests.post(api_url, json=data_raw).text # this part should be done locally- couldn't find a good diff library but I haven't looked hard
+	response3 = requests.get("https://stablediffusion.000webhostapp.com/index.php?search=" + prompt + "&search2=" + prev_prompt).text # store prompt and get similar prompt corrections if any (this probably needs to be improved, it's just using mysql LIKE for similarity search, on a private server I just setup. surely there are better free apis from something like google that do response1 and 3)
+	if("<br>" in response3):
+		response3 = "Suggested correction: " + response3
+	newspan = "<span><img src='" + response1 + "'><br><span>" + response2 + "</span><br><span>" + response3 + "</span></span>" # ugly, ugly code. just getting everything functional first
 	return(newspan)
 
 def create_toprow(is_img2img):
