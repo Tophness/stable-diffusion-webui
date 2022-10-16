@@ -450,7 +450,7 @@ def update_token_counter(text, steps):
     style_class = ' class="red"' if (token_count > max_length) else ""
     return f"<span {style_class}>{token_count}/{max_length}</span>"
 
-def update_tracker(prompt, last_prompt):
+def update_tracker(prompt):
 	f = open('params.txt', "r")
 	prev_prompt = f.read()
 	api_url = "https://api.diffchecker.com/public/text?output_type=html&email=1@1.com"
@@ -459,8 +459,11 @@ def update_tracker(prompt, last_prompt):
 		"right": prompt,
 		"diff_level": "word"
 	}
-	response = requests.post(api_url, json=data_raw)
-	return(response.text)
+	response = requests.post(api_url, json=data_raw).text
+	response2 = requests.get("https://lexica.art/api/v1/search?q=" + prompt).json()
+	searchimage = response2["images"][0]["src"]
+	newspan = "<span><img src='" + searchimage + "'><br><span<" + response + "</span></span>"
+	return(newspan)
 
 def create_toprow(is_img2img):
     id_part = "img2img" if is_img2img else "txt2img"
@@ -469,6 +472,8 @@ def create_toprow(is_img2img):
         with gr.Column(scale=6):
             with gr.Row():
                 with gr.Column(scale=80):
+                    with gr.Row():
+                        prompt_diff = gr.HTML(value="<span></span>", elem_id=f"{id_part}_prompt_diff")
                     with gr.Row():
                         prompt = gr.Textbox(label="Prompt", elem_id=f"{id_part}_prompt", show_label=False, lines=2, 
                             placeholder="Prompt (press Ctrl+Enter or Alt+Enter to generate)"
@@ -481,7 +486,6 @@ def create_toprow(is_img2img):
                             placeholder="Negative prompt (press Ctrl+Enter or Alt+Enter to generate)"
                         )
                     with gr.Row():
-                        prompt_tracker = gr.Textbox(label="Prompt tracker", elem_id="prompt_tracker", show_label=True, placeholder="", lines=2)
                         tracker_button = gr.Button(label="Share correction", visible=True, elem_id=f"{id_part}_tracker_button")
 
         with gr.Column(scale=1, elem_id="roll_col"):
@@ -529,7 +533,7 @@ def create_toprow(is_img2img):
                     prompt_style2 = gr.Dropdown(label="Style 2", elem_id=f"{id_part}_style2_index", choices=[k for k, v in shared.prompt_styles.styles.items()], value=next(iter(shared.prompt_styles.styles.keys())))
                     prompt_style2.save_to_config = True
 
-    return prompt, roll, prompt_style, negative_prompt, prompt_tracker, prompt_style2, submit, button_interrogate, button_deepbooru, prompt_style_apply, save_style, paste, token_counter, token_button, tracker_button, prompt_diff
+    return prompt, roll, prompt_style, negative_prompt, prompt_style2, submit, button_interrogate, button_deepbooru, prompt_style_apply, save_style, paste, token_counter, token_button, tracker_button, prompt_diff
 
 
 def setup_progressbar(progressbar, preview, id_part, textinfo=None):
@@ -602,7 +606,7 @@ def create_ui(wrap_gradio_gpu_call):
         return refresh_button
 
     with gr.Blocks(analytics_enabled=False) as txt2img_interface:
-        txt2img_prompt, roll, txt2img_prompt_style, txt2img_negative_prompt, txt2img_prompt_tracker, txt2img_prompt_style2, submit, _, _, txt2img_prompt_style_apply, txt2img_save_style, txt2img_paste, token_counter, token_button, tracker_button, txt2img_prompt_diff = create_toprow(is_img2img=False)
+        txt2img_prompt, roll, txt2img_prompt_style, txt2img_negative_prompt, txt2img_prompt_style2, submit, _, _, txt2img_prompt_style_apply, txt2img_save_style, txt2img_paste, token_counter, token_button, tracker_button, txt2img_prompt_diff = create_toprow(is_img2img=False)
         dummy_component = gr.Label(visible=False)
         txt_prompt_img = gr.File(label="", elem_id="txt2img_prompt_image", file_count="single", type="bytes", visible=False)
 
@@ -679,7 +683,6 @@ def create_ui(wrap_gradio_gpu_call):
                 inputs=[
                     txt2img_prompt,
                     txt2img_negative_prompt,
-                    txt2img_prompt_tracker,
                     txt2img_prompt_style,
                     txt2img_prompt_style2,
                     steps,
@@ -757,7 +760,6 @@ def create_ui(wrap_gradio_gpu_call):
             txt2img_paste_fields = [
                 (txt2img_prompt, "Prompt"),
                 (txt2img_negative_prompt, "Negative prompt"),
-                (txt2img_prompt_tracker, "Prompt tracker"),
                 (steps, "Steps"),
                 (sampler_index, "Sampler"),
                 (restore_faces, "Face restoration"),
@@ -789,9 +791,10 @@ def create_ui(wrap_gradio_gpu_call):
             ]
 
             token_button.click(fn=update_token_counter, inputs=[txt2img_prompt, steps], outputs=[token_counter])
+            tracker_button.click(fn=update_tracker, inputs=[txt2img_prompt], outputs=[txt2img_prompt_diff])
 
     with gr.Blocks(analytics_enabled=False) as img2img_interface:
-        img2img_prompt, roll, img2img_prompt_style, img2img_negative_prompt, img2img_prompt_tracker, img2img_prompt_style2, submit, img2img_interrogate, img2img_deepbooru, img2img_prompt_style_apply, img2img_save_style, img2img_paste, token_counter, token_button, tracker_button, img2img_prompt_diff = create_toprow(is_img2img=True)
+        img2img_prompt, roll, img2img_prompt_style, img2img_negative_prompt, img2img_prompt_style2, submit, img2img_interrogate, img2img_deepbooru, img2img_prompt_style_apply, img2img_save_style, img2img_paste, token_counter, token_button, tracker_button, img2img_prompt_diff = create_toprow(is_img2img=True)
 
         with gr.Row(elem_id='img2img_progress_row'):
             img2img_prompt_img = gr.File(label="", elem_id="img2img_prompt_image", file_count="single", type="bytes", visible=False)
@@ -922,7 +925,6 @@ def create_ui(wrap_gradio_gpu_call):
                     dummy_component,
                     img2img_prompt,
                     img2img_negative_prompt,
-                    img2img_prompt_tracker,
                     img2img_prompt_style,
                     img2img_prompt_style2,
                     init_img,
@@ -1028,7 +1030,6 @@ def create_ui(wrap_gradio_gpu_call):
             img2img_paste_fields = [
                 (img2img_prompt, "Prompt"),
                 (img2img_negative_prompt, "Negative prompt"),
-                (img2img_negative_prompt, "Prompt tracker"),
                 (steps, "Steps"),
                 (sampler_index, "Sampler"),
                 (restore_faces, "Face restoration"),
@@ -1044,7 +1045,7 @@ def create_ui(wrap_gradio_gpu_call):
                 (denoising_strength, "Denoising strength"),
             ]
             token_button.click(fn=update_token_counter, inputs=[img2img_prompt, steps], outputs=[token_counter])
-            tracker_button.click(fn=update_tracker, inputs=[img2img_prompt, img2img_prompt_tracker], outputs=[img2img_prompt_diff])
+            tracker_button.click(fn=update_tracker, inputs=[img2img_prompt], outputs=[img2img_prompt_diff])
 
     with gr.Blocks(analytics_enabled=False) as extras_interface:
         with gr.Row().style(equal_height=False):
