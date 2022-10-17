@@ -1056,6 +1056,31 @@ class diff_match_patch:
     # Add the remaining len(character).
     return last_chars2 + (loc - last_chars1)
 
+  def fix(self, word, type):
+    if(type == "ins"):
+      bg = "#FF99E7"
+    elif(type == "del"):
+      bg = "#ffce50"
+    else:
+      bg = "#ffffff"
+    html = "<" + type + " oncontextmenu=\"setorigword('%s');return false;\" onclick=\"setcorrection('%s')\" style=\"background:" + bg + ";\" class=\"correctword\">%s</" + type + ">"
+    if ", " in word or "," in word or " " in word:
+      newlist = []
+      for w in re.split('(\W)', word):
+        if(w == "," or w == " "):
+          if(len(newlist) > 0):
+            newlist[-1] = newlist[-1] + w
+          else:
+            newlist.append(w)
+        else:
+          newlist.append(w)
+      newhtml = []
+      for word in newlist:
+        newhtml.append(html % (word,word,word))
+      return "".join(newhtml)
+    else:
+      return html % (word,word,word)
+
   def diff_prettyHtml(self, diffs):
     """Convert a diff array into a pretty HTML report.
 
@@ -1070,11 +1095,11 @@ class diff_match_patch:
       text = (data.replace("&", "&amp;").replace("<", "&lt;")
                  .replace(">", "&gt;").replace("\n", "&para;<br>"))
       if op == self.DIFF_INSERT:
-        html.append("<ins style=\"background:#e6ffe6;\">%s</ins>" % text)
+        html.append(self.fix(text, "ins"))
       elif op == self.DIFF_DELETE:
-        html.append("<del style=\"background:#ffe6e6;\">%s</del>" % text)
+        html.append(self.fix(text, "del"))
       elif op == self.DIFF_EQUAL:
-        html.append("<span>%s</span>" % text)
+        html.append(self.fix(text, "span"))
     return "".join(html)
 
   def diff_text1(self, diffs):

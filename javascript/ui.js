@@ -1,5 +1,13 @@
 // various functions for interation with ui.py not large enough to warrant putting them in separate files
 
+function setcorrection(word){
+    gradioApp().querySelector("#correctbox > label > textarea").value += word;
+}
+
+function setorigword(word){
+    gradioApp().querySelector("#origbox > label > textarea").value += word;
+}
+
 function selected_gallery_index(){
     var buttons = gradioApp().querySelectorAll('[style="display: block;"].tabitem .gallery-item')
     var button = gradioApp().querySelector('[style="display: block;"].tabitem .gallery-item.\\!ring-2')

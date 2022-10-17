@@ -14,6 +14,7 @@ import platform
 import subprocess as sp
 import requests
 import modules.diff_match_patch as dmp_module
+from timeit import default_timer as timer
 from functools import reduce
 
 import numpy as np
@@ -86,6 +87,8 @@ refresh_symbol = '\U0001f504'  # 🔄
 save_style_symbol = '\U0001f4be'  # 💾
 apply_style_symbol = '\U0001f4cb'  # 📋
 
+lastused = timer()
+lastimg = ""
 
 def plaintext_to_html(text):
     text = "<p>" + "<br>\n".join([f"{html.escape(x)}" for x in text.split('\n')]) + "</p>"
@@ -451,18 +454,35 @@ def update_token_counter(text, steps):
     style_class = ' class="red"' if (token_count > max_length) else ""
     return f"<span {style_class}>{token_count}/{max_length}</span>"
 
-def update_tracker(prompt):
-	f = open('params.txt', "r")
-	prev_prompt = f.read().splitlines()[0]
-	response1 = requests.get("https://lexica.art/api/v1/search?q=" + prompt).json()["images"][0]["src"] # get prediction image from lexica.art
-	d = dmp_module.diff_match_patch()
-	diff = d.diff_main(prev_prompt, prompt)
-	response2 = d.diff_prettyHtml(diff)
-	response3 = requests.get("https://stablediffusion.000webhostapp.com/index.php?search=" + prompt + "&search2=" + prev_prompt).text # store prompt and get similar prompt corrections if any (this needs to be improved, it's just using mysql LIKE for similarity search on the entire strings on a private server I just setup. need to work out what parts we want to upload as search/corrections locally so they can be looked up properly)
-	if("<br>" in response3):
-		response3 = "Suggested correction: " + response3
-	newspan = "<span><img src='" + response1 + "'><br><span>" + response2 + "</span><br><span>" + response3 + "</span></span>" # ugly, ugly code. just getting everything functional first
-	return(newspan)
+def share_corrections(origbox, correctbox):
+    response3 = requests.get("https://stablediffusion.000webhostapp.com/index.php?search=" + origbox + "&search2=" + correctbox).text
+    return ""
+
+def getpreviewimage(prompt):
+    global lastused, lastimg
+    if(timer() - lastused > 2):
+        response1 = requests.get("https://lexica.art/api/v1/search?q=" + prompt).json()["images"][0]["src"]
+        lastused = timer()
+        lastimg = response1
+    else:
+        response1 = lastimg
+    return("<span><img src='" + response1 + "'><span>")
+
+def getdiff(prompt):
+    global lastused
+    f = open('params.txt', "r")
+    prev_prompt = f.read().splitlines()[0]
+    d = dmp_module.diff_match_patch()
+    diff = d.diff_main(prev_prompt, prompt)
+    response2 = d.diff_prettyHtml(diff)
+    newspan = "<span>" + response2 + "</span></span>"
+    lastused = timer()
+    return(newspan)
+
+def getcorrections(prompt):
+    response3 = requests.get("https://stablediffusion.000webhostapp.com/index.php?search=" + prompt).text
+    if("<br>" in response3):
+        return(response3.replace("<br>",""))
 
 def create_toprow(is_img2img):
     id_part = "img2img" if is_img2img else "txt2img"
@@ -472,13 +492,22 @@ def create_toprow(is_img2img):
             with gr.Row():
                 with gr.Column(scale=80):
                     with gr.Row():
-                        prompt_diff = gr.HTML(value="<span></span>", elem_id=f"prompt_diff")
-                        tracker_button = gr.Button(value="Share correction", visible=True, elem_id=f"{id_part}_tracker_button")
+                        origbox = gr.Textbox(label="Replace this", elem_id="origbox", show_label=True, lines=2, placeholder="What original prompt text are we replacing?")
+                        correctbox = gr.Textbox(label="With this", elem_id="correctbox", show_label=True, lines=2, placeholder="Replace with this text correction")
+                        corrections_button = gr.Button(value="Get corrections", visible=True, elem_id=f"{id_part}_tracker_button")
+                        share_correct_button = gr.Button(value="Share correction", visible=True, elem_id=f"{id_part}_share_button")
+                    with gr.Row():
+                        previewimg = gr.HTML(value="<span></span>", elem_id="previewimg")
+                    with gr.Row():
+                        prompt_diff = gr.HTML(value="<span></span>", elem_id="prompt_diff")
                     with gr.Row():
                         prompt = gr.Textbox(label="Prompt", elem_id=f"{id_part}_prompt", show_label=False, lines=2, 
                             placeholder="Prompt (press Ctrl+Enter or Alt+Enter to generate)"
                         )
-                        tracker_button.click(fn=update_tracker, inputs=[prompt], outputs=[prompt_diff])
+                        share_correct_button.click(fn=share_corrections, inputs=[origbox, correctbox], outputs=[prompt_diff])
+                        prompt.change(getdiff, prompt, prompt_diff)
+                        prompt.change(getpreviewimage, prompt, previewimg)
+                        corrections_button.click(fn=getcorrections, inputs=[prompt], outputs=[prompt])
 
             with gr.Row():
                 with gr.Column(scale=80):
