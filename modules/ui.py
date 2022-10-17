@@ -13,6 +13,7 @@ import traceback
 import platform
 import subprocess as sp
 import requests
+import modules.diff_match_patch as dmp_module
 from functools import reduce
 
 import numpy as np
@@ -452,16 +453,12 @@ def update_token_counter(text, steps):
 
 def update_tracker(prompt):
 	f = open('params.txt', "r")
-	prev_prompt = f.read()
-	api_url = "https://api.diffchecker.com/public/text?output_type=html&email=1@1.com"
-	data_raw = {
-		"left": prev_prompt.splitlines()[0],
-		"right": prompt,
-		"diff_level": "word"
-	}
+	prev_prompt = f.read().splitlines()[0]
 	response1 = requests.get("https://lexica.art/api/v1/search?q=" + prompt).json()["images"][0]["src"] # get prediction image from lexica.art
-	response2 = requests.post(api_url, json=data_raw).text # this part should be done locally- couldn't find a good diff library but I haven't looked hard
-	response3 = requests.get("https://stablediffusion.000webhostapp.com/index.php?search=" + prompt + "&search2=" + prev_prompt).text # store prompt and get similar prompt corrections if any (this probably needs to be improved, it's just using mysql LIKE for similarity search, on a private server I just setup. surely there are better free apis from something like google that do response1 and 3)
+	d = dmp_module.diff_match_patch()
+	diff = d.diff_main(prev_prompt, prompt)
+	response2 = d.diff_prettyHtml(diff)
+	response3 = requests.get("https://stablediffusion.000webhostapp.com/index.php?search=" + prompt + "&search2=" + prev_prompt).text # store prompt and get similar prompt corrections if any (this needs to be improved, it's just using mysql LIKE for similarity search on the entire strings on a private server I just setup. need to work out what parts we want to upload as search/corrections locally so they can be looked up properly)
 	if("<br>" in response3):
 		response3 = "Suggested correction: " + response3
 	newspan = "<span><img src='" + response1 + "'><br><span>" + response2 + "</span><br><span>" + response3 + "</span></span>" # ugly, ugly code. just getting everything functional first
@@ -476,10 +473,12 @@ def create_toprow(is_img2img):
                 with gr.Column(scale=80):
                     with gr.Row():
                         prompt_diff = gr.HTML(value="<span></span>", elem_id=f"prompt_diff")
+                        tracker_button = gr.Button(value="Share correction", visible=True, elem_id=f"{id_part}_tracker_button")
                     with gr.Row():
                         prompt = gr.Textbox(label="Prompt", elem_id=f"{id_part}_prompt", show_label=False, lines=2, 
                             placeholder="Prompt (press Ctrl+Enter or Alt+Enter to generate)"
                         )
+                        tracker_button.click(fn=update_tracker, inputs=[prompt], outputs=[prompt_diff])
 
             with gr.Row():
                 with gr.Column(scale=80):
@@ -487,9 +486,6 @@ def create_toprow(is_img2img):
                         negative_prompt = gr.Textbox(label="Negative prompt", elem_id=f"{id_part}_neg_prompt", show_label=False, lines=2, 
                             placeholder="Negative prompt (press Ctrl+Enter or Alt+Enter to generate)"
                         )
-                    with gr.Row():
-                        tracker_button = gr.Button(value="Share correction", visible=True, elem_id=f"{id_part}_tracker_button")
-                        tracker_button.click(fn=update_tracker, inputs=[prompt], outputs=[prompt_diff])
 
         with gr.Column(scale=1, elem_id="roll_col"):
             roll = gr.Button(value=art_symbol, elem_id="roll", visible=len(shared.artist_db.artists) > 0)
