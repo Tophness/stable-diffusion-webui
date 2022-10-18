@@ -481,8 +481,8 @@ def getdiff(prompt):
 
 def getcorrections(prompt):
     response3 = requests.get("https://stablediffusion.000webhostapp.com/index.php?search=" + prompt).text
-    if("<br>" in response3):
-        return(response3.replace("<br>",""))
+    if(response3 != "" and response3 != " "):
+        return(response3)
 
 def create_toprow(is_img2img):
     id_part = "img2img" if is_img2img else "txt2img"
