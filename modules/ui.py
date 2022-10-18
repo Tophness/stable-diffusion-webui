@@ -456,7 +456,10 @@ def update_token_counter(text, steps):
 
 def share_corrections(origbox, correctbox):
     response3 = requests.get("https://stablediffusion.000webhostapp.com/index.php?search=" + origbox + "&search2=" + correctbox).text
-    return ""
+    if(response3 == " "):
+        return "Your prompt has been submitted."
+    else:
+        return "Error"
 
 def getpreviewimage(prompt):
     global lastused, lastimg
