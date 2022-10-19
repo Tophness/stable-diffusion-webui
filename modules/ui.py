@@ -472,14 +472,31 @@ def getpreviewimage(prompt):
     return("<span><img src='" + response1 + "'><span>")
 
 def getdiff(prompt):
-    global lastused
     f = open('params.txt', "r")
     prev_prompt = f.read().splitlines()[0]
+    old2 = prev_prompt.replace(", ", ",").strip()
+    new2 = prompt.replace(", ", ",").strip()
+    oldtest = old2.split(",")
+    newtest = new2.split(",")
+    newspan = "<span>"
+    result = []
+    
+    for oldword in oldtest:
+        findpos = prev_prompt.find(oldword.strip())
+        findpos2 = prompt.find(oldword.strip())
+        if(findpos != -1):
+            result.append([findpos,findpos2])
+    for pos in result:
+        if(pos[0] < pos[1]):
+            newspan += "<pre class='correctword'>     " + (pos[0] * " " + "-" * (pos[1] - pos[0])) + "▼</pre>"
+        elif(pos[0] != pos[1]):
+            newspan += "<pre class='correctword'>     " + (pos[1] * " " + "▼" + "-" * (pos[0] - pos[1])) + "</pre>"
+    newspan += "</span>"
+    newspan += "<span style='font: 14px courier;white-space: pre;'>Old: " + prev_prompt + "</span><br>"
     d = dmp_module.diff_match_patch()
     diff = d.diff_main(prev_prompt, prompt)
     response2 = d.diff_prettyHtml(diff)
-    newspan = "<span>" + response2 + "</span></span>"
-    lastused = timer()
+    newspan += "<span style='font: 14px courier;white-space: pre;'>New: " + response2 + "</span>"
     return(newspan)
 
 def getcorrections(prompt):
